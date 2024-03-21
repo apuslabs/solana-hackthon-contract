@@ -7,11 +7,14 @@ skip-lint = false
 [programs.localnet]
 apus_depin = "12EsXujv2DgAgMBKzBJSS92tvMWQefg8C8kpfSP11o1E"
 
+[programs.devnet]
+apus_depin = "12EsXujv2DgAgMBKzBJSS92tvMWQefg8C8kpfSP11o1E"
+
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "https://devnet.helius-rpc.com/?api-key=f46e7c57-a4d4-43b0-b65b-1f287e2380cb"
 wallet = "/Users/zhoujianing/.config/solana/id.json"
 
 [scripts]

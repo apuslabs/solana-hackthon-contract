@@ -71,10 +71,9 @@ pub mod apus_depin {
             //扣用户的user_balance
             //调用铸币厂给agent和gpu node owner
             
-            let mint_bump = ctx.bumps.get("mint").ok_or_else(|| ErrorCode::MissingBump)?;
-        
-            let seeds = &["mint".as_bytes(), &[*mint_bump]];
-            let signer = &[&seeds[..]];
+            let mint_bump: u8 = ctx.bumps.mint;
+            let seeds: &[&[&[u8]]; 1] = &[&["mint".as_bytes(), &[mint_bump]]];
+
             mint_to(
                 CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -83,7 +82,7 @@ pub mod apus_depin {
                     to: ctx.accounts.token_account.to_account_info(),
                     mint: ctx.accounts.mint.to_account_info()
                 },
-                signer,
+                seeds,
                 ),
                 agent_bonus
             )?;
@@ -99,7 +98,7 @@ pub mod apus_depin {
                     to: ctx.accounts.token_account2.to_account_info(),
                     mint: ctx.accounts.mint.to_account_info()
                 },
-                signer,
+                seeds,
                 ),
                 100-agent_bonus
             )?;
@@ -108,8 +107,23 @@ pub mod apus_depin {
         Ok(())
     }
 
-    pub fn batch_submit_task(ctx: Context<RegisterAiTask>, user_balance: u32, agent_bonus: f32) -> Result<()> {
-        
+    static mut TaskStore: Vec<StoreStruct> = Vec::new();
+    pub fn batch_submit_task(ctx: Context<RegisterAiTask>, user_balance: u32, agent_bonus: u64) -> Result<()> {
+        let a = StoreStruct{
+            ctx,
+            user_balance,
+            agent_bonus
+        };
+
+        unsafe{
+            TaskStore.push(a);
+
+            if TaskStore.len() == 5 {
+                for task in TaskStore.drain(..){
+                    submit_task(task.ctx, task.user_balance, task.agent_bonus)?;
+                }
+            }
+        }
 
         Ok(())
     }
@@ -146,7 +160,7 @@ pub struct UpdateCompute<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(instruction_data: AgentArgs, user_balance: u32, agent_bonus:f32)]
+#[instruction(instruction_data: AgentArgs, user_balance: u32, agent_bonus:u64)]
 pub struct RegisterAgent<'info> {
     #[account(init, payer = agent, space = 1024)]
     pub agent: Account<'info, Agent>,
@@ -158,7 +172,7 @@ pub struct RegisterAgent<'info> {
 
 //还需要一个用户的签名 这样才能把他的钱转走
 #[derive(Accounts)]
-#[instruction(instruction_data: AiTaskArgs, user_balance: u32, agent_bonus: f32)]
+#[instruction(instruction_data: AiTaskArgs, user_balance: u32, agent_bonus: u64)]
 pub struct RegisterAiTask<'info> {
     #[account(
         init,
@@ -206,8 +220,6 @@ pub struct RegisterAiTask<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub rent: Sysvar<'info, Rent>
 }
-
-
 
 #[account]
 pub struct Cards {
@@ -303,10 +315,18 @@ pub struct AgentArgs {
 pub struct AiTaskArgs{
     pub user: Pubkey,
     pub node: Pubkey,
+    pub user_sig: [u8; 64],
     pub agent_hash: String,
     pub user_limit: String,
     pub user_timestamp: String,
     pub proof_of_work: String,
     pub node_timestamp: String,
+    pub node_signature: [u8; 64],
     pub price: u32
+}
+
+pub struct StoreStruct{
+    ctx: Context<RegisterAiTask>,
+    pub user_balance: u32,
+    pub agent_bonus: u64
 }
